@@ -35,6 +35,38 @@ public class ApiClient
     public Task<ApiResponse<object>?> DeleteAsync(string url)
         => SendAsync<object>(HttpMethod.Delete, url, null);
 
+    public async Task<(byte[]? Bytes, string? ContentType, bool Success)> GetRawBytesAsync(string url)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrWhiteSpace(_apiKey))
+        {
+            request.Headers.TryAddWithoutValidation("X-Api-Key", _apiKey);
+        }
+
+        var token = _httpContextAccessor.HttpContext?.Session.GetString(SessionKeys.Token);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        try
+        {
+            using var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                return (null, null, false);
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+            return (bytes, contentType, true);
+        }
+        catch
+        {
+            return (null, null, false);
+        }
+    }
+
     private async Task<ApiResponse<T>?> SendAsync<T>(HttpMethod method, string url, object? body)
     {
         using var request = new HttpRequestMessage(method, url);

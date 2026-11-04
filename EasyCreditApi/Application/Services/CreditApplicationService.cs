@@ -70,6 +70,7 @@ public sealed class CreditApplicationService : ICreditApplicationService
 
         var installments = await _oracleInstallmentRepo.GetByApplicationIdAsync(applicationId);
         var customer = await _customerRepository.GetByIdAsync(app.CustomerId);
+        var auditLogs = await _oracleAppRepo.GetAuditLogsByApplicationIdAsync(applicationId);
 
         return new ResCreditApplicationDetailDto
         {
@@ -98,6 +99,17 @@ public sealed class CreditApplicationService : ICreditApplicationService
                 DueDate = i.DueDate,
                 InstallmentAmount = i.InstallmentAmount,
                 Status = i.Status
+            }).ToList(),
+            AuditLogs = auditLogs.Select(a => new ResApprovalAuditLogDto
+            {
+                AuditId = a.AuditId,
+                ApplicationId = a.ApplicationId,
+                Action = a.Action,
+                ActionBy = a.ActionBy,
+                ActionAt = a.ActionAt,
+                PreviousStatus = a.PreviousStatus,
+                NewStatus = a.NewStatus,
+                Notes = a.Notes
             }).ToList()
         };
     }

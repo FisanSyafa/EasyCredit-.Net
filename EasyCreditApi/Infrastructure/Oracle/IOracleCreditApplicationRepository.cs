@@ -9,5 +9,5 @@ public interface IOracleCreditApplicationRepository
     Task<int> CreateWithInstallmentsAsync(CreditApplication application, IEnumerable<CreditInstallment> installments);
     Task<(string Status, string Message)> ApproveOrRejectAsync(int applicationId, string action, string approver);
     Task<(IReadOnlyList<CreditInstallment> Installments, string Status, string Message)> CalculateInstallmentSpAsync(decimal loanAmount, int tenorMonths);
+    Task<IReadOnlyList<ApprovalAuditLog>> GetAuditLogsByApplicationIdAsync(int applicationId);
 }
-

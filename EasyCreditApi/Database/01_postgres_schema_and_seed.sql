@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS mst_user (
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL, -- ADMIN | STAFF
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    refresh_token VARCHAR(255),
+    refresh_token_expiry_time TIMESTAMP
 );
 
 -- 2. Table MST_CUSTOMER
@@ -20,7 +22,9 @@ CREATE TABLE IF NOT EXISTS mst_customer (
     phone VARCHAR(20),
     email VARCHAR(100),
     address VARCHAR(255),
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP
 );
 
 -- 3. Seed Users

@@ -88,6 +88,19 @@ public class CreditApplicationsController : BaseController
     }
 
     [HttpGet]
+    public async Task<IActionResult> DownloadPdf(int id)
+    {
+        var (bytes, contentType, success) = await _apiClient.GetRawBytesAsync($"/api/credit-applications/{id}/pdf");
+        if (!success || bytes is null)
+        {
+            TempData["Error"] = "Gagal mengunduh berkas PDF skema cicilan.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        return File(bytes, contentType ?? "application/pdf", $"skema-cicilan-#{id}.pdf");
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Create()
     {
         var model = new CreateApplicationViewModel

@@ -39,6 +39,9 @@
                 Reject
             </button>
         }
+        <a asp-action="DownloadPdf" asp-route-id="@Model.Application.ApplicationId" class="btn btn-outline-primary" target="_blank">
+            📄 Unduh PDF
+        </a>
         <a asp-action="Index" class="btn btn-light">← Kembali ke Daftar</a>
     </div>
 </div>
@@ -68,10 +71,10 @@
                         <td class="text-muted">Email</td>
                         <td>@(Model.Application.Customer.Email ?? "—")</td>
                     </tr>
-                    <tr>
+                    @* <tr>
                         <td class="text-muted">Alamat</td>
                         <td>@(Model.Application.Customer.Address ?? "—")</td>
-                    </tr>
+                    </tr> *@
                 </table>
             }
             else
@@ -153,6 +156,45 @@
             else
             {
                 <p class="text-muted">Tidak ada jadwal cicilan.</p>
+            }
+        </div>
+
+        <!-- Card Audit Log Persetujuan (Oracle) -->
+        <div class="panel p-4 mt-4">
+            <h5 class="panel-title mb-3">Riwayat Audit Approval (Oracle)</h5>
+            @if (Model.Application.AuditLogs != null && Model.Application.AuditLogs.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Aksi</th>
+                                <th>Oleh</th>
+                                <th>Status Awal</th>
+                                <th>Status Baru</th>
+                                <th>Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Model.Application.AuditLogs)
+                            {
+                                <tr>
+                                    <td class="text-muted">@log.ActionAt.ToString("dd MMM yyyy, HH:mm:ss")</td>
+                                    <td><span class="badge bg-primary">@log.Action</span></td>
+                                    <td><strong>@log.ActionBy</strong></td>
+                                    <td>@(log.PreviousStatus ?? "—")</td>
+                                    <td><span class="@StatusClass(log.NewStatus ?? "")">@(log.NewStatus ?? "—")</span></td>
+                                    <td class="text-muted small">@log.Notes</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">Belum ada riwayat audit approval untuk pengajuan ini.</p>
             }
         </div>
     </div>

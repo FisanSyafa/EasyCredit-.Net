@@ -28,7 +28,9 @@ public class EfCustomerRepository : ICustomerRepository
             return false;
         }
 
-        _dbContext.Customers.Remove(existing);
+        existing.IsDeleted = true;
+        existing.DeletedAt = DateTime.UtcNow;
+        _dbContext.Customers.Update(existing);
         return await _dbContext.SaveChangesAsync() > 0;
     }
 

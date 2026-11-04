@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using EasyCreditApi.Application.DTO.Auth;
 using EasyCreditApi.Application.Interfaces;
 using EasyCreditApi.Domain.Entities;
@@ -29,7 +30,45 @@ public class AuthService : IAuthService
         }
 
         var (token, expiresAt) = _jwtTokenGenerator.GenerateToken(user.UserId, user.Email, user.Name, user.Role);
-        return new ResLoginDto(token, user.Role, user.Name, expiresAt);
+        var refreshToken = _jwtTokenGenerator.GenerateRefreshToken();
+
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        await _userRepository.UpdateAsync(user);
+
+        return new ResLoginDto(token, user.Role, user.Name, expiresAt, refreshToken);
+    }
+
+    public async Task<ResLoginDto?> RefreshTokenAsync(string token, string refreshToken)
+    {
+        var principal = _jwtTokenGenerator.GetPrincipalFromExpiredToken(token);
+        if (principal is null)
+        {
+            return null;
+        }
+
+        var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? principal.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        {
+            return null;
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+        {
+            return null;
+        }
+
+        var (newToken, newExpiresAt) = _jwtTokenGenerator.GenerateToken(user.UserId, user.Email, user.Name, user.Role);
+        var newRefreshToken = _jwtTokenGenerator.GenerateRefreshToken();
+
+        user.RefreshToken = newRefreshToken;
+        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // Sliding expiration
+        await _userRepository.UpdateAsync(user);
+
+        return new ResLoginDto(newToken, user.Role, user.Name, newExpiresAt, newRefreshToken);
     }
 
     public async Task<User> RegisterAsync(string email, string password, string name)

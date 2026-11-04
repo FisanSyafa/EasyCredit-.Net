@@ -3,6 +3,7 @@ using EasyCreditApi.Application.DTO.Auth;
 using EasyCreditApi.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyCreditApi.Controllers;
 
@@ -18,7 +19,8 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    [AllowAnonymous]  // Anyone can hit this endpoint
+    [AllowAnonymous]
+    [EnableRateLimiting("login-limiter")]
     public async Task<IActionResult> Login([FromBody] ReqLoginDto request)
     {
         var result = await _authService.LoginAsync(request.Email, request.Password);
@@ -26,6 +28,17 @@ public class AuthController : ControllerBase
             return Unauthorized(ApiResponse<object>.Fail("Invalid email or password"));
 
         return Ok(ApiResponse<ResLoginDto>.Success(result, "Login successful"));
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RefreshToken([FromBody] ReqRefreshTokenDto request)
+    {
+        var result = await _authService.RefreshTokenAsync(request.AccessToken, request.RefreshToken);
+        if (result is null)
+            return Unauthorized(ApiResponse<object>.Fail("Invalid or expired refresh token"));
+
+        return Ok(ApiResponse<ResLoginDto>.Success(result, "Token refreshed successfully"));
     }
 
     [HttpPost("register")]
@@ -41,7 +54,7 @@ public class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(ApiResponse<object>.Fail(ex.Message));  // 409 — email already exists
+            return Conflict(ApiResponse<object>.Fail(ex.Message));
         }
     }
 }

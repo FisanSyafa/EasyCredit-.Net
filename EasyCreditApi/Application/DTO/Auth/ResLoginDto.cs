@@ -5,5 +5,6 @@ public record ResLoginDto
     string AccessToken,
     string Role,
     string Name,
-    DateTime ExpiresAt
+    DateTime ExpiresAt,
+    string? RefreshToken = null
 );

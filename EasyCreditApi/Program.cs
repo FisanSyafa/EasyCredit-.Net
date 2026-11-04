@@ -14,6 +14,9 @@ using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using EasyCreditApi.Infrastructure.Postgres;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using EasyCreditApi.Infrastructure.Pdf;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,11 +118,25 @@ builder.Services.AddScoped<ICreditApplicationSpService, CreditApplicationSpServi
 builder.Services.AddScoped<IOracleCreditApplicationRepository, OracleCreditApplicationRepository>();
 builder.Services.AddScoped<IOracleCreditInstallmentRepository, OracleCreditInstallmentRepository>();
 builder.Services.AddScoped<ICreditApplicationService, CreditApplicationService>();
+builder.Services.AddScoped<ICreditApplicationPdfService, CreditApplicationPdfService>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<ICustomerRepository, EfCustomerRepository>();
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(postgresConnectionString);
+});
+
+// Rate Limiter untuk Endpoint Login (Opsional Tantangan #6)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("login-limiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
 });
 
 // Project API hanya melayani endpoint JSON di /api.
@@ -209,6 +226,8 @@ app.UseWhen(
     branch => branch.UseMiddleware<ApiKeyMiddleware>());
 
 app.UseHttpsRedirection();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 

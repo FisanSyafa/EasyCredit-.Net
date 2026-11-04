@@ -43,6 +43,7 @@
                     <label asp-for="LoanAmount" class="form-label">Jumlah Pinjaman (Rp)</label>
                     <input asp-for="LoanAmount" class="form-control" type="number" min="1000000" max="50000000" step="500000" id="inputLoanAmount" />
                     <small class="text-muted d-block mt-1">Minimal Rp 1.000.000, Maksimal Rp 50.000.000</small>
+                    <div id="loanAmountWarning" class="text-danger small mt-1 d-none" role="alert"></div>
                     <span asp-validation-for="LoanAmount" class="text-danger"></span>
                 </div>
 
@@ -111,6 +112,40 @@
     <script>
         $(function () {
             var previewUrl = '@Url.Action("PreviewInstallment", "CreditApplications")';
+            var minLoanAmount = 1000000;
+            var maxLoanAmount = 50000000;
+            var $loanAmountInput = $('#inputLoanAmount');
+            var $loanAmountWarning = $('#loanAmountWarning');
+
+            function validateLoanAmount() {
+                var rawValue = $loanAmountInput.val();
+                var loanAmount = parseFloat(rawValue);
+
+                if (rawValue === '' || isNaN(loanAmount)) {
+                    $loanAmountWarning.addClass('d-none').text('');
+                    $loanAmountInput.removeClass('is-invalid');
+                    return;
+                }
+
+                var message = '';
+
+                if (loanAmount < minLoanAmount) {
+                    message = 'Jumlah pinjaman tidak boleh kurang dari Rp 1.000.000.';
+                } else if (loanAmount > maxLoanAmount) {
+                    message = 'Jumlah pinjaman tidak boleh lebih dari Rp 50.000.000.';
+                }
+
+                if (message) {
+                    $loanAmountWarning.text(message).removeClass('d-none');
+                    $loanAmountInput.addClass('is-invalid');
+                } else {
+                    $loanAmountWarning.addClass('d-none').text('');
+                    $loanAmountInput.removeClass('is-invalid');
+                }
+            }
+
+            $loanAmountInput.on('input change keyup blur', validateLoanAmount);
+            validateLoanAmount();
 
             $('#btnPreview').on('click', function () {
                 var loanAmount = parseFloat($('#inputLoanAmount').val());

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 namespace EasyCreditApi.Application.Interfaces;
 
 public interface IJwtTokenGenerator
@@ -7,4 +9,7 @@ public interface IJwtTokenGenerator
         string email,
         string name,
         string role);
+
+    string GenerateRefreshToken();
+    ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
 }

@@ -46,6 +46,25 @@ EXCEPTION
 END;
 /
 
+-- 2.b Table TRN_APPROVAL_AUDIT_LOG
+BEGIN
+    EXECUTE IMMEDIATE '
+    CREATE TABLE EASYCREDIT.TRN_APPROVAL_AUDIT_LOG (
+        AUDIT_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        APPLICATION_ID NUMBER NOT NULL,
+        ACTION VARCHAR2(20) NOT NULL,
+        ACTION_BY VARCHAR2(100) NOT NULL,
+        ACTION_AT TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+        PREVIOUS_STATUS VARCHAR2(20),
+        NEW_STATUS VARCHAR2(20),
+        NOTES VARCHAR2(255)
+    )';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+
 -- ------------------------------------------------------------
 -- 3. Stored Procedure: sp_calculate_installment
 -- Hitung skema cicilan dari loan amount dan tenor tanpa menyimpan.
@@ -168,6 +187,17 @@ BEGIN
         ROLLBACK;
         RETURN;
     END IF;
+
+    -- Catat ke Audit Log
+    BEGIN
+        INSERT INTO EASYCREDIT.TRN_APPROVAL_AUDIT_LOG
+            (APPLICATION_ID, ACTION, ACTION_BY, ACTION_AT, PREVIOUS_STATUS, NEW_STATUS, NOTES)
+        VALUES
+            (p_app_id, UPPER(p_action), p_approver, SYSTIMESTAMP, v_current_status, v_target_status, 'Audit: Pengajuan di-' || LOWER(p_action) || ' oleh ' || p_approver);
+    EXCEPTION
+        WHEN OTHERS THEN
+            NULL;
+    END;
 
     COMMIT;
     out_stat := 'SUCCESS';

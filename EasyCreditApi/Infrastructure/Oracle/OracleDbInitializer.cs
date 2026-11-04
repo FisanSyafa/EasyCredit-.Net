@@ -60,7 +60,29 @@ public static class OracleDbInitializer
                 // ORA-00955: already exists
             }
 
-            // 3. Create or Replace Procedure sp_calculate_installment
+            // 3. Create Table TRN_APPROVAL_AUDIT_LOG
+            try
+            {
+                await conn.ExecuteAsync("""
+                    CREATE TABLE EASYCREDIT.TRN_APPROVAL_AUDIT_LOG (
+                        AUDIT_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                        APPLICATION_ID NUMBER NOT NULL,
+                        ACTION VARCHAR2(20) NOT NULL,
+                        ACTION_BY VARCHAR2(100) NOT NULL,
+                        ACTION_AT TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+                        PREVIOUS_STATUS VARCHAR2(20),
+                        NEW_STATUS VARCHAR2(20),
+                        NOTES VARCHAR2(255)
+                    )
+                    """);
+                Log.Information("Tabel EASYCREDIT.TRN_APPROVAL_AUDIT_LOG berhasil dibuat.");
+            }
+            catch (OracleException ex) when (ex.Number == 955)
+            {
+                // ORA-00955: already exists
+            }
+
+            // 4. Create or Replace Procedure sp_calculate_installment
             const string spCalc = """
                 CREATE OR REPLACE PROCEDURE EASYCREDIT.sp_calculate_installment(
                     p_loan_amount   IN NUMBER,
@@ -118,7 +140,7 @@ public static class OracleDbInitializer
 
             await conn.ExecuteAsync(spCalc);
 
-            // 4. Create or Replace Procedure sp_approve_application
+            // 5. Create or Replace Procedure sp_approve_application with Audit Log
             const string spApprove = """
                 CREATE OR REPLACE PROCEDURE EASYCREDIT.sp_approve_application(
                     p_app_id   IN NUMBER,
@@ -173,6 +195,17 @@ public static class OracleDbInitializer
                         ROLLBACK;
                         RETURN;
                     END IF;
+
+                    -- Insert ke tabel Audit Log Approval
+                    BEGIN
+                        INSERT INTO EASYCREDIT.TRN_APPROVAL_AUDIT_LOG
+                            (APPLICATION_ID, ACTION, ACTION_BY, ACTION_AT, PREVIOUS_STATUS, NEW_STATUS, NOTES)
+                        VALUES
+                            (p_app_id, UPPER(p_action), p_approver, SYSTIMESTAMP, v_current_status, v_target_status, 'Audit: Pengajuan di-' || LOWER(p_action) || ' oleh ' || p_approver);
+                    EXCEPTION
+                        WHEN OTHERS THEN
+                            NULL; -- Cegah kegagalan audit membatalkan approval
+                    END;
 
                     COMMIT;
                     out_stat := 'SUCCESS';

@@ -46,6 +46,19 @@ public class CreditApplicationsController : ControllerBase
         return Ok(ApiResponse<ResCreditApplicationDetailDto>.Success(application));
     }
 
+    [HttpGet("{id:int}/pdf")]
+    public async Task<IActionResult> DownloadPdf([FromRoute] int id, [FromServices] ICreditApplicationPdfService pdfService)
+    {
+        var application = await _service.GetByIdAsync(id);
+        if (application is null)
+        {
+            return NotFound(ApiResponse<object>.Fail("Pengajuan kredit tidak ditemukan."));
+        }
+
+        var pdfBytes = pdfService.GenerateInstallmentSchedulePdf(application);
+        return File(pdfBytes, "application/pdf", $"skema-cicilan-{id}.pdf");
+    }
+
     [HttpPost("preview-installment")]
     public async Task<IActionResult> PreviewInstallment([FromBody] ReqPreviewInstallmentDto dto)
     {

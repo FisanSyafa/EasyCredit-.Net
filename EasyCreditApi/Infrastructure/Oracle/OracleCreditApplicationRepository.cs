@@ -9,6 +9,7 @@ public sealed class OracleCreditApplicationRepository : IOracleCreditApplication
 {
     private const string Table = "EASYCREDIT.TRN_CREDIT_APPLICATION";
     private const string InstallmentTable = "EASYCREDIT.TRN_CREDIT_INSTALLMENT";
+    private const string AuditTable = "EASYCREDIT.TRN_APPROVAL_AUDIT_LOG";
     private const string Schema = "EASYCREDIT";
 
     private readonly OracleConnectionFactory _factory;
@@ -82,10 +83,10 @@ public sealed class OracleCreditApplicationRepository : IOracleCreditApplication
                 APPROVED_BY AS ApprovedBy,
                 APPROVED_AT AS ApprovedAt
             FROM {Table}
-            WHERE APPLICATION_ID = :ApplicationId
+            WHERE APPLICATION_ID = :Id
             """;
 
-        return await conn.QueryFirstOrDefaultAsync<CreditApplication>(sql, new { ApplicationId = applicationId });
+        return await conn.QuerySingleOrDefaultAsync<CreditApplication>(sql, new { Id = applicationId });
     }
 
     public async Task<int> CreateWithInstallmentsAsync(
@@ -98,6 +99,14 @@ public sealed class OracleCreditApplicationRepository : IOracleCreditApplication
 
         try
         {
+            const string insertAppSql = $"""
+                INSERT INTO {Table} 
+                    (CUSTOMER_ID, LOAN_AMOUNT, TENOR_MONTHS, INTEREST_RATE, CREDIT_SCORE, STATUS, APPLICATION_DATE)
+                VALUES 
+                    (:CustomerId, :LoanAmount, :TenorMonths, :InterestRate, :CreditScore, :Status, :AppDate)
+                RETURNING APPLICATION_ID INTO :NewId
+                """;
+
             var p = new DynamicParameters();
             p.Add("CustomerId", application.CustomerId, DbType.Int32);
             p.Add("LoanAmount", application.LoanAmount, DbType.Decimal);
@@ -108,15 +117,8 @@ public sealed class OracleCreditApplicationRepository : IOracleCreditApplication
             p.Add("AppDate", application.ApplicationDate, DbType.Date);
             p.Add("NewId", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
-            const string insertAppSql = $"""
-                INSERT INTO {Table} 
-                    (CUSTOMER_ID, LOAN_AMOUNT, TENOR_MONTHS, INTEREST_RATE, CREDIT_SCORE, STATUS, APPLICATION_DATE)
-                VALUES 
-                    (:CustomerId, :LoanAmount, :TenorMonths, :InterestRate, :CreditScore, :Status, :AppDate)
-                RETURNING APPLICATION_ID INTO :NewId
-                """;
-
             await conn.ExecuteAsync(insertAppSql, p, tx);
+
             var newAppId = p.Get<int>("NewId");
             application.ApplicationId = newAppId;
 
@@ -137,6 +139,26 @@ public sealed class OracleCreditApplicationRepository : IOracleCreditApplication
                     Amount = inst.InstallmentAmount,
                     Status = inst.Status
                 }, tx);
+            }
+
+            // Insert initial Audit Log
+            try
+            {
+                const string insertAuditSql = $"""
+                    INSERT INTO {AuditTable}
+                        (APPLICATION_ID, ACTION, ACTION_BY, ACTION_AT, PREVIOUS_STATUS, NEW_STATUS, NOTES)
+                    VALUES
+                        (:AppId, 'SUBMIT', 'SYSTEM', :ActionAt, NULL, 'PENDING', 'Pengajuan kredit baru dibuat')
+                    """;
+                await conn.ExecuteAsync(insertAuditSql, new
+                {
+                    AppId = newAppId,
+                    ActionAt = DateTime.UtcNow
+                }, tx);
+            }
+            catch
+            {
+                // Non-critical jika tabel audit belum terbuat
             }
 
             tx.Commit();
@@ -193,5 +215,33 @@ public sealed class OracleCreditApplicationRepository : IOracleCreditApplication
 
         return (items.ToList(), status, message);
     }
-}
 
+    public async Task<IReadOnlyList<ApprovalAuditLog>> GetAuditLogsByApplicationIdAsync(int applicationId)
+    {
+        await using var conn = _factory.Create();
+        try
+        {
+            const string sql = $"""
+                SELECT 
+                    AUDIT_ID AS AuditId,
+                    APPLICATION_ID AS ApplicationId,
+                    ACTION AS Action,
+                    ACTION_BY AS ActionBy,
+                    ACTION_AT AS ActionAt,
+                    PREVIOUS_STATUS AS PreviousStatus,
+                    NEW_STATUS AS NewStatus,
+                    NOTES AS Notes
+                FROM {AuditTable}
+                WHERE APPLICATION_ID = :ApplicationId
+                ORDER BY AUDIT_ID ASC
+                """;
+
+            var logs = await conn.QueryAsync<ApprovalAuditLog>(sql, new { ApplicationId = applicationId });
+            return logs.ToList();
+        }
+        catch
+        {
+            return Array.Empty<ApprovalAuditLog>();
+        }
+    }
+}

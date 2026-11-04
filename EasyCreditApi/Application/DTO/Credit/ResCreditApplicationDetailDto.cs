@@ -16,5 +16,5 @@ public class ResCreditApplicationDetailDto
     public string? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public List<ResInstallmentDto> Installments { get; set; } = new();
+    public List<ResApprovalAuditLogDto> AuditLogs { get; set; } = new();
 }
-

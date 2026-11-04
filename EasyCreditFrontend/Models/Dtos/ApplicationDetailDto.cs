@@ -14,5 +14,5 @@ public class ApplicationDetailDto
     public string? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public List<InstallmentDto> Installments { get; set; } = new();
+    public List<AuditLogDto> AuditLogs { get; set; } = new();
 }
-
