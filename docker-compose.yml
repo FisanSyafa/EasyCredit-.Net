@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: easycredit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: easycredit
+      POSTGRES_USER: easycredit_user
+      POSTGRES_PASSWORD: easycredit_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./EasyCreditApi/Database/01_postgres_schema_and_seed.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+
+  oracle:
+    image: gvenzl/oracle-free:latest
+    container_name: easycredit-oracle
+    restart: unless-stopped
+    environment:
+      ORACLE_PASSWORD: Password1
+      APP_USER: EASYCREDIT
+      APP_USER_PASSWORD: Password1
+    ports:
+      - "1522:1521"
+    volumes:
+      - oracledata:/opt/oracle/oradata
+      - ./EasyCreditApi/Database/02_oracle_schema_and_sp.sql:/container-entrypoint-initdb.d/02_init.sql:ro
+
+volumes:
+  pgdata:
+  oracledata:
+

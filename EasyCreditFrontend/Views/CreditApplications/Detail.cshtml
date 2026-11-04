@@ -1,0 +1,288 @@
+@model ApplicationDetailViewModel
+@{
+    ViewData["Title"] = $"Detail Pengajuan #{Model.Application.ApplicationId}";
+
+    string StatusClass(string status) => status?.ToUpperInvariant() switch
+    {
+        "APPROVED" => "badge-status is-approved",
+        "REJECTED" => "badge-status is-rejected",
+        _ => "badge-status is-pending"
+    };
+}
+
+<div class="page-head d-flex justify-content-between align-items-center">
+    <div>
+        <div class="crumbs">
+            <a asp-controller="Home" asp-action="Index">Dashboard</a>
+            <span>/</span>
+            <a asp-action="Index">Pengajuan Kredit</a>
+            <span>/</span>
+            <span>#@Model.Application.ApplicationId</span>
+        </div>
+        <h2>Pengajuan Kredit #@Model.Application.ApplicationId</h2>
+        <p class="text-muted">
+            Status: <span class="@StatusClass(Model.Application.Status)">@Model.Application.Status</span>
+            &nbsp;•&nbsp; Diajukan pada: @Model.Application.ApplicationDate.ToString("dd MMMM yyyy, HH:mm")
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        @if (Model.CanApproveOrReject && ViewBag.IsAdmin == true)
+        {
+            <button type="button" class="btn btn-accent js-approve"
+                    data-id="@Model.Application.ApplicationId"
+                    data-customer="@Model.Application.Customer?.Name">
+                Approve
+            </button>
+            <button type="button" class="btn btn-danger js-reject"
+                    data-id="@Model.Application.ApplicationId"
+                    data-customer="@Model.Application.Customer?.Name">
+                Reject
+            </button>
+        }
+        <a asp-action="Index" class="btn btn-light">← Kembali ke Daftar</a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Informasi Pinjaman & Nasabah -->
+    <div class="col-lg-5 mb-4">
+        <!-- Card Nasabah (PostgreSQL) -->
+        <div class="panel p-4 mb-4">
+            <h5 class="panel-title mb-3">Data Nasabah (PostgreSQL)</h5>
+            @if (Model.Application.Customer is not null)
+            {
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <td class="text-muted" style="width: 35%;">Nama</td>
+                        <td><strong>@Model.Application.Customer.Name</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">NIK</td>
+                        <td class="mono">@Model.Application.Customer.Nik</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Telepon</td>
+                        <td>@(Model.Application.Customer.Phone ?? "—")</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Email</td>
+                        <td>@(Model.Application.Customer.Email ?? "—")</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Alamat</td>
+                        <td>@(Model.Application.Customer.Address ?? "—")</td>
+                    </tr>
+                </table>
+            }
+            else
+            {
+                <p class="text-danger">Data nasabah tidak ditemukan.</p>
+            }
+        </div>
+
+        <!-- Card Pengajuan (Oracle) -->
+        <div class="panel p-4">
+            <h5 class="panel-title mb-3">Informasi Kredit (Oracle)</h5>
+            <table class="table table-borderless table-sm mb-0">
+                <tr>
+                    <td class="text-muted" style="width: 45%;">Jumlah Pinjaman</td>
+                    <td class="mono font-weight-bold text-success" style="font-size: 1.1rem;">
+                        Rp @Model.Application.LoanAmount.ToString("N0")
+                    </td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Tenor</td>
+                    <td>@Model.Application.TenorMonths Bulan</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Suku Bunga</td>
+                    <td>@(Model.Application.InterestRate * 100)% / tahun</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Skor Kredit</td>
+                    <td><span class="badge bg-primary">@Model.Application.CreditScore</span></td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Disetujui / Ditolak Oleh</td>
+                    <td>@(Model.Application.ApprovedBy ?? "—")</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Waktu Keputusan</td>
+                    <td>@(Model.Application.ApprovedAt?.ToString("dd MMM yyyy, HH:mm") ?? "—")</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Jadwal Cicilan (TRN_CREDIT_INSTALLMENT) -->
+    <div class="col-lg-7">
+        <div class="panel p-4 mb-4">
+            <h5 class="panel-title mb-3">Jadwal Cicilan Pinjaman (@Model.Application.Installments.Count Angsuran)</h5>
+            @if (Model.Application.Installments.Any())
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Jatuh Tempo</th>
+                                <th class="text-end">Jumlah Angsuran</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var inst in Model.Application.Installments)
+                            {
+                                <tr>
+                                    <td class="mono text-muted">#@inst.InstallmentNo</td>
+                                    <td>@inst.DueDate.ToString("dd MMMM yyyy")</td>
+                                    <td class="text-end mono font-weight-bold">
+                                        Rp @inst.InstallmentAmount.ToString("N0")
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge-status @(inst.Status == "PAID" ? "is-approved" : "is-pending")">
+                                            @inst.Status
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">Tidak ada jadwal cicilan.</p>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal Approve -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Setujui Pengajuan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <p>Konfirmasi persetujuan pengajuan pinjaman sebesar <strong>Rp @Model.Application.LoanAmount.ToString("N0")</strong>.</p>
+                <label for="approverName" class="form-label">Nama Approver</label>
+                <input id="approverName" class="form-control" value="@ViewBag.UserName" />
+                <div class="field-error text-danger mt-1" id="approveError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-accent" id="btnApproveSubmit">Setujui (Approve)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reject -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Tolak Pengajuan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <p>Konfirmasi penolakan pengajuan pinjaman sebesar <strong>Rp @Model.Application.LoanAmount.ToString("N0")</strong>.</p>
+                <label for="rejectApprover" class="form-label">Nama Petugas Penolak</label>
+                <input id="rejectApprover" class="form-control" value="@ViewBag.UserName" />
+                <div class="field-error text-danger mt-1" id="rejectError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="btnRejectSubmit">Tolak (Reject)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            var approveModal = new bootstrap.Modal(document.getElementById('approveModal'));
+            var rejectModal = new bootstrap.Modal(document.getElementById('rejectModal'));
+            var appId = @Model.Application.ApplicationId;
+
+            $('.js-approve').on('click', function () {
+                $('#approveError').text('');
+                approveModal.show();
+            });
+
+            $('#btnApproveSubmit').on('click', function () {
+                var approver = $('#approverName').val().trim();
+                if (!approver) {
+                    $('#approveError').text('Nama approver wajib diisi.');
+                    return;
+                }
+
+                $(this).prop('disabled', true);
+                $.ajax({
+                    url: '@Url.Action("Approve", "CreditApplications")',
+                    type: 'POST',
+                    data: {
+                        ApplicationId: appId,
+                        Approver: approver,
+                        __RequestVerificationToken: EC.token()
+                    },
+                    success: function (res) {
+                        if (res.status) {
+                            EC.toast('success', res.message, 'Berhasil');
+                            setTimeout(function () { location.reload(); }, 1000);
+                        } else {
+                            $('#btnApproveSubmit').prop('disabled', false);
+                            $('#approveError').text(res.message);
+                        }
+                    },
+                    error: function () {
+                        $('#btnApproveSubmit').prop('disabled', false);
+                        $('#approveError').text('Gagal menghubungi server.');
+                    }
+                });
+            });
+
+            $('.js-reject').on('click', function () {
+                $('#rejectError').text('');
+                rejectModal.show();
+            });
+
+            $('#btnRejectSubmit').on('click', function () {
+                var approver = $('#rejectApprover').val().trim();
+                if (!approver) {
+                    $('#rejectError').text('Nama petugas wajib diisi.');
+                    return;
+                }
+
+                $(this).prop('disabled', true);
+                $.ajax({
+                    url: '@Url.Action("Reject", "CreditApplications")',
+                    type: 'POST',
+                    data: {
+                        ApplicationId: appId,
+                        Approver: approver,
+                        __RequestVerificationToken: EC.token()
+                    },
+                    success: function (res) {
+                        if (res.status) {
+                            EC.toast('success', res.message, 'Berhasil');
+                            setTimeout(function () { location.reload(); }, 1000);
+                        } else {
+                            $('#btnRejectSubmit').prop('disabled', false);
+                            $('#rejectError').text(res.message);
+                        }
+                    },
+                    error: function () {
+                        $('#btnRejectSubmit').prop('disabled', false);
+                        $('#rejectError').text('Gagal menghubungi server.');
+                    }
+                });
+            });
+        });
+    </script>
+}
+

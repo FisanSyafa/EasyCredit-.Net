@@ -1,0 +1,360 @@
+@model ApplicationIndexViewModel
+@{
+    ViewData["Title"] = "Pengajuan Kredit";
+
+    string StatusClass(string status) => status?.ToUpperInvariant() switch
+    {
+        "APPROVED" => "badge-status is-approved",
+        "REJECTED" => "badge-status is-rejected",
+        _ => "badge-status is-pending"
+    };
+}
+
+<div class="page-head d-flex justify-content-between align-items-center">
+    <div>
+        <div class="crumbs">
+            <a asp-controller="Home" asp-action="Index">Dashboard</a>
+            <span>/</span>
+            <span>Pengajuan Kredit</span>
+        </div>
+        <h2>Daftar Pengajuan Kredit</h2>
+        <p class="text-muted">
+            Kelola dan pantau seluruh transaksi pengajuan kredit nasabah.
+        </p>
+    </div>
+    <div>
+        <a asp-action="Create" class="btn btn-accent">
+            + Ajukan Kredit Baru
+        </a>
+    </div>
+</div>
+
+<form asp-action="Index" method="get" class="toolbar mb-4">
+    <div class="search-field">
+        <span class="search-icon">⌕</span>
+        <input name="keyword"
+               value="@Model.Keyword"
+               class="form-control"
+               placeholder="Cari nama nasabah atau ID pengajuan…"
+               autocomplete="off" />
+    </div>
+
+    <select name="status" class="form-select toolbar-select" aria-label="Filter status">
+        <option value="">Semua status</option>
+        @foreach (var status in new[] { "PENDING", "SUBMITTED", "APPROVED", "REJECTED" })
+        {
+            <option value="@status" selected="@(string.Equals(Model.Status, status, StringComparison.OrdinalIgnoreCase))">
+                @status
+            </option>
+        }
+    </select>
+
+    <button type="submit" class="btn btn-dark">Filter</button>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Status) || !string.IsNullOrWhiteSpace(Model.Keyword))
+    {
+        <a class="btn btn-light" asp-action="Index">Reset</a>
+    }
+</form>
+
+<div class="panel">
+    @if (!Model.Items.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-icon">▤</div>
+            <h4>Tidak ada pengajuan</h4>
+            <p>Belum ada data pengajuan yang cocok dengan filter saat ini.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table" id="applicationTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nasabah</th>
+                        <th class="text-end">Pinjaman</th>
+                        <th>Tenor</th>
+                        <th>Status</th>
+                        <th>Tanggal</th>
+                        <th>Approver</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr data-id="@item.ApplicationId">
+                            <td class="mono text-dim">#@item.ApplicationId</td>
+                            <td>
+                                <span class="cell-strong">@item.CustomerName</span>
+                                <small class="d-block text-dim mono">customer #@item.CustomerId</small>
+                            </td>
+                            <td class="text-end mono">Rp @item.Amount.ToString("N0")</td>
+                            <td>@item.TenorMonths bulan</td>
+                            <td>
+                                <span class="js-status @StatusClass(item.Status)">@item.Status</span>
+                            </td>
+                            <td class="text-dim">@item.ApplicationDate.ToString("dd MMM yyyy")</td>
+                            <td class="text-dim js-approver">@(item.ApprovedBy ?? "—")</td>
+                            <td>
+                                <div class="row-actions justify-content-end d-flex gap-1">
+                                    <a asp-action="Detail" asp-route-id="@item.ApplicationId" class="btn btn-light btn-sm">
+                                        Detail
+                                    </a>
+
+                                    @if (item.CanApprove)
+                                    {
+                                        @if (ViewBag.IsAdmin == true)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-accent btn-sm js-approve"
+                                                    data-id="@item.ApplicationId"
+                                                    data-customer="@item.CustomerName">
+                                                Approve
+                                            </button>
+                                            <button type="button"
+                                                    class="btn btn-danger btn-sm js-reject"
+                                                    data-id="@item.ApplicationId"
+                                                    data-customer="@item.CustomerName">
+                                                Reject
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary align-self-center">Menunggu Admin</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-light btn-sm" disabled>
+                                            Selesai
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="panel-foot">
+            <span class="text-dim">Menampilkan @Model.Items.Count dari @Model.Total pengajuan</span>
+
+            <div class="pager">
+                <a class="btn btn-light btn-sm @(Model.HasPreviousPage ? "" : "disabled")"
+                   asp-action="Index"
+                   asp-route-page="@(Model.Page - 1)"
+                   asp-route-status="@Model.Status"
+                   asp-route-keyword="@Model.Keyword">
+                    Sebelumnya
+                </a>
+
+                <span class="pager-info mono">@Model.Page / @Model.TotalPages</span>
+
+                <a class="btn btn-light btn-sm @(Model.HasNextPage ? "" : "disabled")"
+                   asp-action="Index"
+                   asp-route-page="@(Model.Page + 1)"
+                   asp-route-status="@Model.Status"
+                   asp-route-keyword="@Model.Keyword">
+                    Berikutnya
+                </a>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Modal Approve -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Setujui Pengajuan Kredit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-dim mb-3">
+                    Apakah Anda yakin ingin menyetujui pengajuan <strong id="approveApplicationId">#0</strong> milik
+                    <strong id="approveCustomerName">—</strong>?
+                </p>
+
+                <label for="approverName" class="form-label">Nama Approver</label>
+                <input id="approverName" class="form-control" maxlength="100" value="@ViewBag.UserName" placeholder="Masukkan nama approver" />
+                <div class="field-error text-danger mt-1" id="approveError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-accent" id="approveSubmit">Setujui (Approve)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reject -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Tolak Pengajuan Kredit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-dim mb-3">
+                    Apakah Anda yakin ingin menolak pengajuan <strong id="rejectApplicationId">#0</strong> milik
+                    <strong id="rejectCustomerName">—</strong>?
+                </p>
+
+                <label for="rejectApproverName" class="form-label">Nama Petugas Penolak</label>
+                <input id="rejectApproverName" class="form-control" maxlength="100" value="@ViewBag.UserName" placeholder="Masukkan nama petugas" />
+                <div class="field-error text-danger mt-1" id="rejectError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="rejectSubmit">Tolak (Reject)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            var approveUrl = '@Url.Action("Approve", "CreditApplications")';
+            var rejectUrl = '@Url.Action("Reject", "CreditApplications")';
+
+            var approveModal = new bootstrap.Modal(document.getElementById('approveModal'));
+            var rejectModal = new bootstrap.Modal(document.getElementById('rejectModal'));
+
+            var currentId = null;
+            var currentButton = null;
+
+            // Trigger Modal Approve
+            $('#applicationTable').on('click', '.js-approve', function () {
+                currentButton = $(this);
+                currentId = currentButton.data('id');
+
+                $('#approveApplicationId').text('#' + currentId);
+                $('#approveCustomerName').text(currentButton.data('customer'));
+                $('#approveError').text('');
+                approveModal.show();
+            });
+
+            // Submit Approve
+            $('#approveSubmit').on('click', function () {
+                var submitBtn = $(this);
+                var approver = $('#approverName').val().trim();
+
+                if (!approver) {
+                    $('#approveError').text('Nama approver wajib diisi.');
+                    return;
+                }
+
+                submitBtn.prop('disabled', true);
+
+                $.ajax({
+                    url: approveUrl,
+                    type: 'POST',
+                    data: {
+                        ApplicationId: currentId,
+                        Approver: approver,
+                        __RequestVerificationToken: EC.token()
+                    },
+                    success: function (response) {
+                        submitBtn.prop('disabled', false);
+
+                        if (!response.status) {
+                            var message = response.message || 'Approve gagal.';
+                            $('#approveError').text(message);
+                            if (/tidak dapat|status/i.test(message)) {
+                                setTimeout(function () { location.reload(); }, 1400);
+                            }
+                            return;
+                        }
+
+                        var row = $('tr[data-id="' + response.applicationId + '"]');
+                        var statusBadge = row.find('.js-status');
+
+                        statusBadge.removeClass('is-pending is-rejected')
+                                   .addClass('is-approved')
+                                   .text('APPROVED');
+
+                        row.find('.js-approver').text(response.approver);
+                        row.find('.row-actions').html('<a href="/CreditApplications/Detail/' + response.applicationId + '" class="btn btn-light btn-sm">Detail</a><button type="button" class="btn btn-light btn-sm" disabled>Selesai</button>');
+
+                        approveModal.hide();
+                        EC.toast('success', response.message, 'Berhasil');
+                    },
+                    error: function () {
+                        submitBtn.prop('disabled', false);
+                        $('#approveError').text('Tidak dapat menghubungi server.');
+                    }
+                });
+            });
+
+            // Trigger Modal Reject
+            $('#applicationTable').on('click', '.js-reject', function () {
+                currentButton = $(this);
+                currentId = currentButton.data('id');
+
+                $('#rejectApplicationId').text('#' + currentId);
+                $('#rejectCustomerName').text(currentButton.data('customer'));
+                $('#rejectError').text('');
+                rejectModal.show();
+            });
+
+            // Submit Reject
+            $('#rejectSubmit').on('click', function () {
+                var submitBtn = $(this);
+                var approver = $('#rejectApproverName').val().trim();
+
+                if (!approver) {
+                    $('#rejectError').text('Nama petugas wajib diisi.');
+                    return;
+                }
+
+                submitBtn.prop('disabled', true);
+
+                $.ajax({
+                    url: rejectUrl,
+                    type: 'POST',
+                    data: {
+                        ApplicationId: currentId,
+                        Approver: approver,
+                        __RequestVerificationToken: EC.token()
+                    },
+                    success: function (response) {
+                        submitBtn.prop('disabled', false);
+
+                        if (!response.status) {
+                            var message = response.message || 'Reject gagal.';
+                            $('#rejectError').text(message);
+                            if (/tidak dapat|status/i.test(message)) {
+                                setTimeout(function () { location.reload(); }, 1400);
+                            }
+                            return;
+                        }
+
+                        var row = $('tr[data-id="' + response.applicationId + '"]');
+                        var statusBadge = row.find('.js-status');
+
+                        statusBadge.removeClass('is-pending is-approved')
+                                   .addClass('is-rejected')
+                                   .text('REJECTED');
+
+                        row.find('.js-approver').text(response.approver);
+                        row.find('.row-actions').html('<a href="/CreditApplications/Detail/' + response.applicationId + '" class="btn btn-light btn-sm">Detail</a><button type="button" class="btn btn-light btn-sm" disabled>Selesai</button>');
+
+                        rejectModal.hide();
+                        EC.toast('success', response.message, 'Berhasil');
+                    },
+                    error: function () {
+                        submitBtn.prop('disabled', false);
+                        $('#rejectError').text('Tidak dapat menghubungi server.');
+                    }
+                });
+            });
+        });
+    </script>
+}
