@@ -1,0 +1,40 @@
+@EasyCreditApi_HostAddress = http://localhost:5052
+
+### API — butuh header X-Api-Key
+GET {{EasyCreditApi_HostAddress}}/api/customers
+Accept: application/json
+X-Api-Key: easycredit-dev-api-key
+
+### API — login, lalu pakai Bearer token
+POST {{EasyCreditApi_HostAddress}}/api/auth/login
+Content-Type: application/json
+X-Api-Key: easycredit-dev-api-key
+
+{
+  "email": "admin@mail.com",
+  "password": "Admin123!"
+}
+
+### API — daftar pengajuan (butuh Bearer token)
+GET {{EasyCreditApi_HostAddress}}/api/credit-applications
+Accept: application/json
+X-Api-Key: easycredit-dev-api-key
+Authorization: Bearer {{token}}
+
+### Frontend MVC — jalankan di port 5200
+GET http://localhost:5200/Auth/Login
+
+### Frontend MVC — dashboard (butuh session login)
+GET http://localhost:5200/
+
+### Frontend MVC — customer
+GET http://localhost:5200/Customers
+
+### Frontend MVC — partial tabel customer (dipanggil jQuery AJAX)
+GET http://localhost:5200/Customers/Rows?keyword=&page=1&size=10
+
+### Frontend MVC — form tambah customer
+GET http://localhost:5200/Customers/Create
+
+### Frontend MVC — pengajuan
+GET http://localhost:5200/CreditApplications

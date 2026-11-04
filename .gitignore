@@ -1,0 +1,16 @@
+## Build & Output
+**/bin/
+**/obj/
+**/Logs/
+*.log
+
+## IDE & Editors
+.vs/
+.vscode/
+.zed/
+*.user
+*.suo
+
+## OS files
+.DS_Store
+Thumbs.db
